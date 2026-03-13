@@ -5,6 +5,8 @@ from typing import Optional
 
 from openai import OpenAI
 
+from log_llm import log_llm_call
+
 logger = logging.getLogger(__name__)
 
 
@@ -47,6 +49,9 @@ class OpenAIClient:
                 full_response = response.choices[0].message.content or ""
                 logger.debug(f"Полный ответ OpenAI: {full_response}")
 
+                # Логируем запрос/ответ в SQLite
+                log_llm_call(self.model, system_prompt, full_response)
+
                 city = self._extract_city_from_response(full_response)
                 if city:
                     logger.info(f"OpenAI ответил: '{city}' (извлечено из: '{full_response}')")
@@ -81,8 +86,12 @@ class OpenAIClient:
                 temperature=0.3,
                 max_tokens=150,
             )
+            content = response.choices[0].message.content
 
-            return response.choices[0].message.content
+            # Логируем запрос/ответ в SQLite
+            log_llm_call(self.model, prompt, content)
+
+            return content
 
         except Exception as e:
             logger.error(f"Ошибка при получении информации о городе (OpenAI): {e}")
@@ -110,7 +119,10 @@ class OpenAIClient:
                     temperature=0.0,
                     max_tokens=3,
                 )
-                answer = (response.choices[0].message.content or "").strip().upper()
+                raw_answer = response.choices[0].message.content or ""
+                answer = raw_answer.strip().upper()
+                # Логируем запрос/ответ в SQLite
+                log_llm_call(self.model, question, raw_answer)
                 logger.debug(f"Проверка города '{city_name}' в OpenAI: ответ '{answer}'")
                 if "ДА" in answer:
                     return True

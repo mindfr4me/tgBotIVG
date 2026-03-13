@@ -5,6 +5,8 @@ from typing import Optional
 from gigachat import GigaChat
 from gigachat.models import Chat, Messages, MessagesRole
 
+from log_llm import log_llm_call
+
 logger = logging.getLogger(__name__)
 
 class GigaChatClient:
@@ -60,7 +62,10 @@ class GigaChatClient:
                 # Логируем полный ответ
                 full_response = response.choices[0].message.content
                 logger.debug(f"Полный ответ GigaChat: {full_response}")
-                
+
+                # Логируем запрос/ответ в SQLite
+                log_llm_call(self.model, system_prompt, full_response)
+
                 city = self._extract_city_from_response(response)
                 
                 if city:
@@ -106,8 +111,12 @@ class GigaChatClient:
                     max_tokens=150
                 )
             )
-            
-            return response.choices[0].message.content
+            content = response.choices[0].message.content
+
+            # Логируем запрос/ответ в SQLite
+            log_llm_call(self.model, prompt, content)
+
+            return content
             
         except Exception as e:
             logger.error(f"Ошибка при получении информации о городе: {e}")
@@ -140,7 +149,10 @@ class GigaChatClient:
                         max_tokens=3
                     )
                 )
-                answer = response.choices[0].message.content.strip().upper()
+                raw_answer = response.choices[0].message.content or ""
+                answer = raw_answer.strip().upper()
+                # Логируем запрос/ответ в SQLite
+                log_llm_call(self.model, question, raw_answer)
                 logger.debug(f"Проверка города '{city_name}' в GigaChat: ответ '{answer}'")
                 if "ДА" in answer:
                     return True
